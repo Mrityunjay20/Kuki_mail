@@ -1,370 +1,266 @@
 import streamlit as st
 import pandas as pd
 import smtplib
-from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
-from jinja2 import Template
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
+import os
+from dotenv import load_dotenv
 from streamlit_quill import st_quill
+import re
+from email_validator import validate_email, EmailNotValidError
+from pathlib import Path
+import time
 
-st.set_page_config(page_title="Smart Email Sender", layout="wide")
-st.title("📧 Smart Personalized Email Sender")
+# Load environment variables
+load_dotenv()
 
-st.markdown("""
-Upload a CSV with these columns:
+def init_session_state():
+    if 'email_sent' not in st.session_state:
+        st.session_state.email_sent = False
+    if 'progress' not in st.session_state:
+        st.session_state.progress = 0
 
-- `name`  
-- `email`  
-- `starting_line`  
-
-Use `{{ name }}` and `{{ starting_line }}` in your message or subject to personalize them.
-
-You'll also have the option to preview your message by sending a test email to yourself.
-""")
-
-# Step 1: Upload CSV
-uploaded_file = st.file_uploader("📄 Upload Contacts CSV", type="csv")
-
-# Step 2: Gmail Info
-your_email = st.text_input("📬 Your Gmail Address")
-app_password = st.text_input("🔐 App Password", type="password")
-
-# Step 3: Email Subject
-subject = st.text_input("📌 Email Subject (You can use {{ name }} and {{ starting_line }} here too)")
-
-# Step 4: Custom Greeting
-greeting_line = st.text_input("👋 Greeting (e.g., Hi {{ name }},)", value="Hi {{ name }},")
-
-# Step 5: Email Body Editor
-st.markdown("### 📝 Write Your Email Body")
-editor_content = st_quill(placeholder="Start typing your promotional message...", html=True)  # Important: set html=True
-
-# Step 6: Attachments
-attachments = st.file_uploader("📎 Upload Attachments (Optional)", type=None, accept_multiple_files=True)
-
-# Function to apply template variables to any text content
-def apply_template_variables(content, variables):
-    # Replace template placeholders like {{ name }} with actual values
-    template = Template(content)
-    return template.render(**variables)
-
-# ------------------------------
-# Send Test Email Section
-# ------------------------------
-st.markdown("---")
-st.markdown("### 🧪 Send a Test Email")
-test_button = st.button("📤 Send Test Email to Myself")
-
-if test_button and your_email and app_password and subject and editor_content:
-    try:
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(your_email, app_password)
-
-        test_name = "YourName"
-        test_line = "This is a sample starting line just for preview."
-        
-        # Create proper email HTML structure
-        # First apply the template variables to the greeting
-        personal_vars = {"name": test_name, "starting_line": test_line}
-        personalized_greeting = Template(greeting_line).render(**personal_vars)
-        
-        # Personalize the subject line
-        personalized_subject = apply_template_variables(subject, personal_vars)
-        
-        # Process the main editor content for template variables
-        if "{{ starting_line }}" in editor_content:
-            editor_content = editor_content.replace("{{ starting_line }}", test_line)
-        if "{{ name }}" in editor_content:
-            editor_content = editor_content.replace("{{ name }}", test_name)
-        
-        # Full HTML email with proper structure and styling
-        html_email = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                body {{ 
-                    font-family: Arial, sans-serif; 
-                    line-height: 1.4; 
-                    color: #333333; 
-                    margin: 0;
-                    padding: 0;
-                }}
-                .email-container {{ 
-                    max-width: 600px; 
-                    margin: 0 auto; 
-                    padding: 20px; 
-                }}
-                .greeting {{ 
-                    font-size: 16px; 
-                    margin-bottom: 15px; 
-                }}
-                .content p {{
-                    margin-top: 0;
-                    margin-bottom: 10px;
-                }}
-                .content {{
-                    margin: 0;
-                    padding: 0;
-                }}
-                /* List styles */
-                ul, ol {{ 
-                    padding-left: 25px; 
-                    margin: 10px 0; 
-                }}
-                li {{ 
-                    margin-bottom: 5px; 
-                }}
-                strong {{ font-weight: bold; }}
-                em {{ font-style: italic; }}
-                u {{ text-decoration: underline; }}
-                pre, code {{
-                    white-space: pre-wrap;
-                    font-family: monospace;
-                    background-color: #f5f5f5;
-                    padding: 5px;
-                    border-radius: 3px;
-                }}
-                blockquote {{
-                    margin-left: 0;
-                    padding-left: 10px;
-                    border-left: 3px solid #ccc;
-                    color: #555;
-                }}
-                /* Fix spacing */
-                .ql-editor p {{
-                    margin: 0 !important;
-                }}
-                /* Fix alignment */
-                .ql-align-justify {{
-                    text-align: justify;
-                }}
-                .ql-align-center {{
-                    text-align: center;
-                }}
-                .ql-align-right {{
-                    text-align: right;
-                }}
-                /* Tab spacing */
-                .tab {{
-                    display: inline-block;
-                    width: 2em;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="email-container">
-                <div class="greeting">{personalized_greeting}</div>
-                <div class="content">{editor_content}</div>
-            </div>
-        </body>
-        </html>
-        """
-
-        msg = MIMEMultipart('alternative')
-        msg["From"] = your_email
-        msg["To"] = your_email
-        msg["Subject"] = f"[TEST] {personalized_subject}"
-        
-        # Add plain text version (fallback)
-        plain_text = f"{personalized_greeting}\n\n{test_line}\n"
-        msg.attach(MIMEText(plain_text, 'plain'))
-        
-        # Add HTML version with proper content type
-        msg.attach(MIMEText(html_email, 'html'))
-
-        # Attach files
-        for file in attachments:
-            file.seek(0)  # Reset file pointer
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(file.read())
-            encoders.encode_base64(part)
-            part.add_header("Content-Disposition", f'attachment; filename="{file.name}"')
-            msg.attach(part)
-            file.seek(0)  # Reset for reuse
-
-        server.sendmail(your_email, your_email, msg.as_string())
-        server.quit()
-        st.success("✅ Test email sent to your address!")
-        
-        # Show a preview of the email
-        with st.expander("Show Email Preview"):
-            st.markdown("### Subject Preview")
-            st.code(personalized_subject)
-            st.markdown("### HTML Content Preview")
-            st.code(html_email[:500] + "..." if len(html_email) > 500 else html_email)
-
-    except Exception as e:
-        st.error(f"❌ Error sending test email: {e}")
-
-# ------------------------------
-# Bulk Email Section
-# ------------------------------
-st.markdown("---")
-st.markdown("### 🚀 Send to All Recipients")
-
-if uploaded_file and your_email and app_password and subject and editor_content:
-    df = pd.read_csv(uploaded_file)
-    
-    st.write(f"Found {len(df)} recipients in your CSV file")
-    
-    if st.button("📨 Send Emails to Everyone"):
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
+def validate_emails(df):
+    invalid_emails = []
+    for idx, row in df.iterrows():
         try:
-            server = smtplib.SMTP("smtp.gmail.com", 587)
+            validate_email(row['email'])
+        except EmailNotValidError:
+            invalid_emails.append(f"Row {idx + 2}: {row['email']}")
+    return invalid_emails
+
+# def clean_content(content):
+#     # Process line by line to handle tabs and spaces
+#     lines = []
+#     prev_empty = False
+    
+#     for line in content.split('\n'):
+#         # Convert tabs to spaces while preserving alignment
+#         line = line.expandtabs(4)
+#         # Keep leading spaces but remove trailing ones
+#         line = line.rstrip()
+        
+#         # Handle empty lines
+#         if not line:
+#             if not prev_empty:  # Only add <br> if previous line wasn't empty
+#                 lines.append('<br>')
+#             prev_empty = True
+#         else:
+#             lines.append(line)
+#             prev_empty = False
+    
+#     # Join lines with spaces (no <br> between consecutive non-empty lines)
+#     content = ' '.join(lines)
+#     return content
+
+def clean_content(content):
+    # Convert all line break indicators to single <br> tags
+    content = content.replace('</p><p>', '<br>')  # Handle Quill's paragraph separation
+    content = content.replace('<p>', '').replace('</p>', '<br>')  # Remove <p> tags
+    content = re.sub(r'<br>\s*<br>', '<br>', content)  # Remove consecutive <br> tags
+    return content.strip()
+
+def send_test_email(sender_email, sender_password, subject, content, attachments):
+    try:
+        # Create message
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = sender_email
+        msg['Subject'] = "Test Email"
+        
+        # Clean and format content
+        cleaned_content = clean_content(content)
+        # Add HTML content with proper styling
+        html_content = f"""
+<html>
+    <head>
+        <style>
+            body {{ font-family: Arial, sans-serif; }}
+            .content {{ 
+                white-space: pre-line;  # This respects line breaks but collapses multiple spaces
+                line-height: 1.4;       # Adjust this to control spacing between lines
+                margin: 0;
+                padding: 0;
+            }}
+            .content br {{
+                display: block;         # Makes <br> behave like line breaks
+                content: "";            # No extra content
+                margin-bottom: 0;       # Remove extra spacing
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="content">{cleaned_content}</div>
+    </body>
+</html>
+"""
+        msg.attach(MIMEText(html_content, 'html'))
+        
+        # Add attachments
+        if attachments:
+            for file in attachments:
+                with open(file.name, 'rb') as f:
+                    attachment = MIMEApplication(f.read())
+                    attachment.add_header('Content-Disposition', 'attachment', filename=file.name.split('/')[-1])
+                    msg.attach(attachment)
+        
+        # Send email
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
-            server.login(your_email, app_password)
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+        
+        return True, "Test email sent successfully!"
+    except Exception as e:
+        return False, f"Error sending test email: {str(e)}"
+
+def send_bulk_emails(df, sender_email, sender_password, subject_template, content, attachments):
+    total_emails = len(df)
+    success_count = 0
+    
+    for idx, row in df.iterrows():
+        try:
+            # Create message
+            msg = MIMEMultipart()
+            msg['From'] = sender_email
+            msg['To'] = row['email']
             
-            total_emails = len(df)
-            emails_sent = 0
+            # Replace variables in subject
+            personalized_subject = subject_template.replace('{name}', row['name'])
+            msg['Subject'] = personalized_subject
             
-            for index, row in df.iterrows():
-                name = row["name"]
-                to_email = row["email"]
-                starting_line = row.get("starting_line", "")
-                
-                # Create proper email HTML structure
-                # First apply the template variables to the greeting
-                personal_vars = {"name": name, "starting_line": starting_line}
-                personalized_greeting = Template(greeting_line).render(**personal_vars)
-                
-                # Personalize the subject line
-                personalized_subject = apply_template_variables(subject, personal_vars)
-                
-                # Process the main editor content for template variables
-                personalized_content = editor_content
-                if "{{ starting_line }}" in personalized_content:
-                    personalized_content = personalized_content.replace("{{ starting_line }}", starting_line)
-                if "{{ name }}" in personalized_content:
-                    personalized_content = personalized_content.replace("{{ name }}", name)
-                
-                # Full HTML email with proper structure and styling
-                html_email = f"""
-                <!DOCTYPE html>
-                <html>
+            # Clean, personalize and format content
+            personalized_content = content.replace('{name}', row['name'])
+            cleaned_content = clean_content(personalized_content)
+            html_content = f"""
+            <html>
                 <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
                     <style>
-                        body {{ 
-                            font-family: Arial, sans-serif; 
-                            line-height: 1.2; 
-                            color: #333333; 
-                            margin: 0;
-                            padding: 0;
-                        }}
-                        .email-container {{ 
-                            max-width: 600px; 
-                            margin: 0 auto; 
-                            padding: 20px; 
-                        }}
-                        .greeting {{ 
-                            font-size: 16px; 
-                            margin-bottom: 15px; 
-                        }}
-                        .content p {{
-                            margin-top: 0;
-                            margin-bottom: 10px;
-                        }}
-                        .content {{
-                            margin: 0;
-                            padding: 0;
-                        }}
-                        /* List styles */
-                        ul, ol {{ 
-                            padding-left: 25px; 
-                            margin: 10px 0; 
-                        }}
-                        li {{ 
-                            margin-bottom: 5px; 
-                        }}
-                        strong {{ font-weight: bold; }}
-                        em {{ font-style: italic; }}
-                        u {{ text-decoration: underline; }}
-                        pre, code {{
-                            white-space: pre-wrap;
-                            font-family: monospace;
-                            background-color: #f5f5f5;
-                            padding: 5px;
-                            border-radius: 3px;
-                        }}
-                        blockquote {{
-                            margin-left: 0;
-                            padding-left: 10px;
-                            border-left: 3px solid #ccc;
-                            color: #555;
-                        }}
-                        /* Fix spacing */
-                        .ql-editor p {{
-                            margin: 0 !important;
-                        }}
-                        /* Fix alignment */
-                        .ql-align-justify {{
-                            text-align: justify;
-                        }}
-                        .ql-align-center {{
-                            text-align: center;
-                        }}
-                        .ql-align-right {{
-                            text-align: right;
-                        }}
-                        /* Tab spacing */
-                        .tab {{
-                            display: inline-block;
-                            width: 2em;
+                        body {{ font-family: Arial, sans-serif; }}
+                        .content {{ 
+                            white-space: pre-wrap !important;
+                            line-height: 1;
                         }}
                     </style>
                 </head>
                 <body>
-                    <div class="email-container">
-                        <div class="greeting">{personalized_greeting}</div>
-                        <div class="content">{personalized_content}</div>
-                    </div>
+                    <div class="content">{cleaned_content}</div>
                 </body>
-                </html>
-                """
-                
-                msg = MIMEMultipart('alternative')
-                msg["From"] = your_email
-                msg["To"] = to_email
-                msg["Subject"] = personalized_subject
-                
-                # Add plain text version (fallback)
-                plain_text = f"{personalized_greeting}\n\n{starting_line}\n"
-                msg.attach(MIMEText(plain_text, 'plain'))
-                
-                # Add HTML version with proper content type
-                msg.attach(MIMEText(html_email, 'html'))
-                
-                # Attach files
-                for file in attachments:
-                    file.seek(0)  # Reset file pointer
-                    part = MIMEBase("application", "octet-stream")
-                    part.set_payload(file.read())
-                    encoders.encode_base64(part)
-                    part.add_header("Content-Disposition", f'attachment; filename="{file.name}"')
-                    msg.attach(part)
-                    file.seek(0)  # Reset for reuse
-                
-                server.sendmail(your_email, to_email, msg.as_string())
-                
-                # Update progress
-                emails_sent += 1
-                status_text.text(f"✅ Email sent to {name} ({to_email})")
-                progress_bar.progress(emails_sent / total_emails)
+            </html>
+            """
+            msg.attach(MIMEText(html_content, 'html'))
             
-            server.quit()
-            st.balloons()
-            st.success("🎉 All emails sent successfully!")
+            # Add attachments
+            if attachments:
+                for file in attachments:
+                    with open(file.name, 'rb') as f:
+                        attachment = MIMEApplication(f.read())
+                        attachment.add_header('Content-Disposition', 'attachment', filename=file.name.split('/')[-1])
+                        msg.attach(attachment)
+            
+            # Send email
+            with smtplib.SMTP('smtp.gmail.com', 587) as server:
+                server.starttls()
+                server.login(sender_email, sender_password)
+                server.send_message(msg)
+            
+            success_count += 1
+            st.session_state.progress = (success_count / total_emails)
+            time.sleep(0.1)  # Small delay to prevent rate limiting
             
         except Exception as e:
-            st.error(f"❌ Error: {e}")
+            st.error(f"Error sending email to {row['email']}: {str(e)}")
+    
+    return success_count
+
+def main():
+    st.set_page_config(page_title="Bulk Email Sender", page_icon="📧")
+    init_session_state()
+    
+    st.title("📧 Bulk Email Sender")
+    
+    # Email Configuration
+    with st.expander("Email Configuration", expanded=True):
+        sender_email = st.text_input("Sender Email (Gmail)", key="sender_email")
+        sender_password = st.text_input("App Password", type="password", help="Use Gmail App Password", key="sender_password")
+    
+    # File Upload
+    uploaded_file = st.file_uploader("Upload file (CSV or Excel with columns: name, email)", type=['csv', 'xlsx', 'xls'])
+    if uploaded_file:
+        try:
+            # Determine file type and read accordingly
+            file_extension = uploaded_file.name.split('.')[-1].lower()
+            if file_extension == 'csv':
+                df = pd.read_csv(uploaded_file)
+            else:  # xlsx or xls
+                df = pd.read_excel(uploaded_file)
+            if not all(col in df.columns for col in ['name', 'email']):
+                st.error("File must contain 'name' and 'email' columns!")
+                return
+        except pd.errors.EmptyDataError:
+            st.error("The uploaded file is empty!")
+            return
+        except Exception as e:
+            st.error(f"Error reading file: {str(e)}")
+            return
+        # Validate emails
+        invalid_emails = validate_emails(df)
+        if invalid_emails:
+            st.error("Invalid emails found:")
+            for email in invalid_emails:
+                st.write(email)
+            return
+        
+        st.success(f"✅ CSV loaded successfully with {len(df)} recipients")
+        
+        # Email Content
+        subject = st.text_input("Email Subject (Use {name} for recipient's name)", 
+                              placeholder="Hello {name}!")
+        
+        st.write("Email Content (Use {name} for recipient's name)")
+        content = st_quill(placeholder="Write your email content here...", 
+                         html=True)
+        
+        # File Attachments
+        attachments = st.file_uploader("Attach Files", 
+                                     accept_multiple_files=True)
+        
+        col1, col2 = st.columns(2)
+        
+        # Test Email
+        with col1:
+            if st.button("Send Test Email"):
+                    if not all([sender_email, sender_password, subject, content]):
+                        st.error("Please fill in all required fields!")
+                    else:
+                        success, message = send_test_email(
+                            sender_email, sender_password, subject, content, attachments
+                        )
+                        if success:
+                            st.success(message)
             
-else:
-    st.info("Fill all the fields, upload your CSV, and you're good to go!")
+        # Send Bulk Emails
+        with col2:
+            if st.button("Send Bulk Emails"):
+                if not all([sender_email, sender_password, subject, content]):
+                    st.error("Please fill in all required fields!")
+                else:
+                    progress_bar = st.progress(0)
+                    
+                    success_count = send_bulk_emails(
+                        df, sender_email, sender_password, subject, content, attachments
+                    )
+                    
+                    if success_count == len(df):
+                        st.balloons()
+                        st.success(f"🎉 Successfully sent {success_count} emails!")
+                    else:
+                        st.warning(f"Sent {success_count} out of {len(df)} emails")
+            
+        # Progress Bar
+        if st.session_state.progress > 0:
+            st.progress(st.session_state.progress)
+
+if __name__ == "__main__":
+    main()

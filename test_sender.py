@@ -30,19 +30,36 @@ def validate_emails(df):
             invalid_emails.append(f"Row {idx + 2}: {row['email']}")
     return invalid_emails
 
-def clean_content(content):
-    # Process line by line to handle tabs and spaces
-    lines = []
-    for line in content.split('\n'):
-        # Convert tabs to spaces while preserving alignment
-        line = line.expandtabs(4)
-        # Keep leading spaces but remove trailing ones
-        lines.append(line.rstrip())
+# def clean_content(content):
+#     # Process line by line to handle tabs and spaces
+#     lines = []
+#     prev_empty = False
+    
+#     for line in content.split('\n'):
+#         # Convert tabs to spaces while preserving alignment
+#         line = line.expandtabs(4)
+#         # Keep leading spaces but remove trailing ones
+#         line = line.rstrip()
+        
+#         # Handle empty lines
+#         if not line:
+#             if not prev_empty:  # Only add <br> if previous line wasn't empty
+#                 lines.append('<br>')
+#             prev_empty = True
+#         else:
+#             lines.append(line)
+#             prev_empty = False
+    
+#     # Join lines with spaces (no <br> between consecutive non-empty lines)
+#     content = ' '.join(lines)
+#     return content
 
-    # Join lines and remove multiple consecutive newlines
-    content = '\n'.join(lines)
-    cleaned = re.sub(r'\n{3,}', '\n\n', content)
-    return cleaned
+def clean_content(content):
+    # Convert all line break indicators to single <br> tags
+    content = content.replace('</p><p>', '<br>')  # Handle Quill's paragraph separation
+    content = content.replace('<p>', '').replace('</p>', '<br>')  # Remove <p> tags
+    content = re.sub(r'<br>\s*<br>', '<br>', content)  # Remove consecutive <br> tags
+    return content.strip()
 
 def send_test_email(sender_email, sender_password, subject, content, attachments):
     try:
@@ -56,31 +73,28 @@ def send_test_email(sender_email, sender_password, subject, content, attachments
         cleaned_content = clean_content(content)
         # Add HTML content with proper styling
         html_content = f"""
-        <html>
-            <head>
-                <style>
-                    body {{ font-family: Arial, sans-serif; }}
-                    p {{ margin: 0; padding: 0; white-space: pre-wrap !important; }}
-                    pre {{ white-space: pre-wrap; margin: 0; }}
-                    .ql-editor p {{ white-space: pre-wrap !important; }}
-                    .content {{ 
-                        white-space: pre-wrap !important;
-                        line-height: 1.5;
-                    }}
-                    .content p:empty {{ 
-                        margin-bottom: 1.5em;
-                        min-height: 1.5em;
-                    }}
-                    .content p:not(:empty) {{ 
-                        margin-bottom: 0;
-                    }}
-                </style>
-            </head>
-            <body>
-                <div class="content">{cleaned_content}</div>
-            </body>
-        </html>
-        """
+<html>
+    <head>
+        <style>
+            body {{ font-family: Arial, sans-serif; }}
+            .content {{ 
+                white-space: pre-line;  # This respects line breaks but collapses multiple spaces
+                line-height: 1.4;       # Adjust this to control spacing between lines
+                margin: 0;
+                padding: 0;
+            }}
+            .content br {{
+                display: block;         # Makes <br> behave like line breaks
+                content: "";            # No extra content
+                margin-bottom: 0;       # Remove extra spacing
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="content">{cleaned_content}</div>
+    </body>
+</html>
+"""
         msg.attach(MIMEText(html_content, 'html'))
         
         # Add attachments
@@ -124,19 +138,9 @@ def send_bulk_emails(df, sender_email, sender_password, subject_template, conten
                 <head>
                     <style>
                         body {{ font-family: Arial, sans-serif; }}
-                        p {{ margin: 0; padding: 0; white-space: pre-wrap !important; }}
-                        pre {{ white-space: pre-wrap; margin: 0; }}
-                        .ql-editor p {{ white-space: pre-wrap !important; }}
                         .content {{ 
                             white-space: pre-wrap !important;
-                            line-height: 1rem;
-                        }}
-                        .content p:empty {{ 
-                            margin-bottom: 0;
-                            min-height:0;
-                        }}
-                        .content p:not(:empty) {{ 
-                            margin-bottom: 0;
+                            line-height: 1;
                         }}
                     </style>
                 </head>
