@@ -87,16 +87,74 @@ if test_button and your_email and app_password and subject and editor_content:
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333333; }}
-                .email-container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .greeting {{ font-size: 16px; margin-bottom: 15px; }}
+                body {{ 
+                    font-family: Arial, sans-serif; 
+                    line-height: 1.4; 
+                    color: #333333; 
+                    margin: 0;
+                    padding: 0;
+                }}
+                .email-container {{ 
+                    max-width: 600px; 
+                    margin: 0 auto; 
+                    padding: 20px; 
+                }}
+                .greeting {{ 
+                    font-size: 16px; 
+                    margin-bottom: 15px; 
+                }}
+                .content p {{
+                    margin-top: 0;
+                    margin-bottom: 10px;
+                }}
+                .content {{
+                    margin: 0;
+                    padding: 0;
+                }}
                 /* List styles */
-                ul, ol {{ padding-left: 30px; margin: 10px 0; }}
-                li {{ margin-bottom: 5px; }}
+                ul, ol {{ 
+                    padding-left: 25px; 
+                    margin: 10px 0; 
+                }}
+                li {{ 
+                    margin-bottom: 5px; 
+                }}
                 strong {{ font-weight: bold; }}
                 em {{ font-style: italic; }}
                 u {{ text-decoration: underline; }}
-            </style>	
+                pre, code {{
+                    white-space: pre-wrap;
+                    font-family: monospace;
+                    background-color: #f5f5f5;
+                    padding: 5px;
+                    border-radius: 3px;
+                }}
+                blockquote {{
+                    margin-left: 0;
+                    padding-left: 10px;
+                    border-left: 3px solid #ccc;
+                    color: #555;
+                }}
+                /* Fix spacing */
+                .ql-editor p {{
+                    margin: 0 !important;
+                }}
+                /* Fix alignment */
+                .ql-align-justify {{
+                    text-align: justify;
+                }}
+                .ql-align-center {{
+                    text-align: center;
+                }}
+                .ql-align-right {{
+                    text-align: right;
+                }}
+                /* Tab spacing */
+                .tab {{
+                    display: inline-block;
+                    width: 2em;
+                }}
+            </style>
         </head>
         <body>
             <div class="email-container">
@@ -138,7 +196,7 @@ if test_button and your_email and app_password and subject and editor_content:
             st.markdown("### Subject Preview")
             st.code(personalized_subject)
             st.markdown("### HTML Content Preview")
-            st.text(html_email[:500] + "..." if len(html_email) > 500 else html_email)
+            st.code(html_email[:500] + "..." if len(html_email) > 500 else html_email)
 
     except Exception as e:
         st.error(f"❌ Error sending test email: {e}")
@@ -194,16 +252,74 @@ if uploaded_file and your_email and app_password and subject and editor_content:
                     <meta charset="UTF-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
                     <style>
-                        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333333; }}
-                        .email-container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                        .greeting {{ font-size: 16px; margin-bottom: 15px; }}
+                        body {{ 
+                            font-family: Arial, sans-serif; 
+                            line-height: 1.2; 
+                            color: #333333; 
+                            margin: 0;
+                            padding: 0;
+                        }}
+                        .email-container {{ 
+                            max-width: 600px; 
+                            margin: 0 auto; 
+                            padding: 20px; 
+                        }}
+                        .greeting {{ 
+                            font-size: 16px; 
+                            margin-bottom: 15px; 
+                        }}
+                        .content p {{
+                            margin-top: 0;
+                            margin-bottom: 10px;
+                        }}
+                        .content {{
+                            margin: 0;
+                            padding: 0;
+                        }}
                         /* List styles */
-                        ul, ol {{ padding-left: 30px; margin: 10px 0; }}
-                        li {{ margin-bottom: 5px; }}
+                        ul, ol {{ 
+                            padding-left: 25px; 
+                            margin: 10px 0; 
+                        }}
+                        li {{ 
+                            margin-bottom: 5px; 
+                        }}
                         strong {{ font-weight: bold; }}
                         em {{ font-style: italic; }}
                         u {{ text-decoration: underline; }}
-                    </style>	
+                        pre, code {{
+                            white-space: pre-wrap;
+                            font-family: monospace;
+                            background-color: #f5f5f5;
+                            padding: 5px;
+                            border-radius: 3px;
+                        }}
+                        blockquote {{
+                            margin-left: 0;
+                            padding-left: 10px;
+                            border-left: 3px solid #ccc;
+                            color: #555;
+                        }}
+                        /* Fix spacing */
+                        .ql-editor p {{
+                            margin: 0 !important;
+                        }}
+                        /* Fix alignment */
+                        .ql-align-justify {{
+                            text-align: justify;
+                        }}
+                        .ql-align-center {{
+                            text-align: center;
+                        }}
+                        .ql-align-right {{
+                            text-align: right;
+                        }}
+                        /* Tab spacing */
+                        .tab {{
+                            display: inline-block;
+                            width: 2em;
+                        }}
+                    </style>
                 </head>
                 <body>
                     <div class="email-container">
